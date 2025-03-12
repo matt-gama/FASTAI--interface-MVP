@@ -274,7 +274,7 @@ def delete_ia(id_ia):
             host = os.getenv("HOST_API")
             api_key = os.getenv("API_KEY")
 
-            url = f"{host}instance/delete/{ia.name}_{current_user.id}"
+            url = f"{host}/instance/delete/{ia.name}_{current_user.id}"
 
             headers = {"apikey": api_key}
 
