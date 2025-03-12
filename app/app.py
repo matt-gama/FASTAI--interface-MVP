@@ -320,7 +320,8 @@ def new_prompt(id_ia):
         new_prompt = Prompt(
             prompt_text=new_prompt_text,
             is_active=True if status == 'True' else False,
-            ia_id=id_ia
+            ia_id=id_ia,
+            user_id=current_user.id
         )
         
         db.session.add(new_prompt)
