@@ -155,7 +155,7 @@ def create_ia():
             new_ia = IA(
                 name=name,
                 phone_number=phone_number,
-                id_user = current_user.id,
+                user_id = current_user.id,
                 status=True
             )
             
