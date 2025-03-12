@@ -10,6 +10,7 @@ import os
 
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
+from app.crypto import *
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -73,6 +74,7 @@ class Prompt(db.Model):
     __tablename__ = 'prompts'
     id = db.Column(db.Integer, primary_key=True, index=True)
     ia_id = db.Column(db.Integer, db.ForeignKey('ias.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     prompt_text = db.Column(db.String, nullable=False)
     is_active = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), server_default=db.func.now())
@@ -153,7 +155,7 @@ def create_ia():
             new_ia = IA(
                 name=name,
                 phone_number=phone_number,
-                user_id = current_user.id,
+                id_user = current_user.id,
                 status=True
             )
             
@@ -289,8 +291,9 @@ def delete_ia(id_ia):
 @app.route('/get-prompts-ia', methods=['GET'])
 @login_required
 def get_prompts_ia():
-    prompts = Prompt.query.all()
-    ias = IA.query.all()
+    id_user = current_user.id
+    ias = IA.query.filter_by(user_id=id_user).all()
+    prompts = Prompt.query.filter_by(user_id=id_user).all()
     prompts_list = []
     for prompt in prompts:
         prompt_dict = {
