@@ -4,7 +4,7 @@ from cryptography.fernet import Fernet
 
 # Obtenha a chave de criptografia via variável de ambiente ou gere uma nova (atenção: a geração de chave em runtime não é ideal para produção)
 FERNET_KEY = os.getenv("FERNET_KEY", Fernet.generate_key().decode())
-
+  
 fernet = Fernet(FERNET_KEY.encode())
 
 def encrypt_data(data: dict) -> str:
