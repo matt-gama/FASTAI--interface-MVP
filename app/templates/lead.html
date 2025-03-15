@@ -3,11 +3,11 @@
 	<div class="row">
 		<!-- Mapa de Leads (Sidebar) -->
 		<div class="col-md-4 border-right" style="max-height: 100vh; overflow-y: auto">
-			<h4 class="mt-4">Leads</h4>
+			<h4 class="mt-4">Leads ({{ leads|length }})</h4>
 			<div class="list-group">
 				{% for lead in leads %}
 				<a href="{{ url_for('get_leads_ia', ia_id=lead.ia_id, lead_id=lead.id) }}" class="list-group-item list-group-item-action {% if selected_lead and selected_lead.id == lead.id %}active{% endif %}">
-					<strong>{{ lead.name }}</strong><br />
+					<strong>{% if not lead.bloqueado %}<i class="bi bi-lock-fill"></i>{% endif %}{{ lead.name }}</strong><br />
 					<small>{{ lead.phone }}</small><br />
 					<small>Última interação: {{ lead.updated_at }}</small>
 				</a>
@@ -21,6 +21,17 @@
 			<div class="mt-4">
 				<h4>Chat - {{ selected_lead.name }}</h4>
 				<p><strong>IA:</strong> {{ selected_lead.ia_name }}</p>
+				<p><strong>Unique Token:</strong> {{ selected_lead.unique_token }}</p>
+				
+				{% if selected_lead.bloqueado %}
+					<button class="btn btn-sm btn-secondary" data-toggle="modal" data-target="#acaoPromptModal{{ selected_lead.id }}" title="Deletar lead">
+						<i class="bi bi-lock-fill"></i> Bloquear
+					</button>
+				{% else %}
+					<button class="btn btn-sm btn-secondary" data-toggle="modal" data-target="#acaoPromptModal{{ selected_lead.id }}" title="Deletar lead">
+						<i class="bi bi-unlock-fill"></i> Desbloquear
+					</button>
+				{% endif %}
 				<button class="btn btn-sm btn-danger" data-toggle="modal" data-target="#deletePromptModal{{ selected_lead.id }}" title="Deletar lead">
 					<i class="bi bi-trash"></i>
 				</button>
@@ -59,6 +70,30 @@
 					{% endif %} {% endfor %}
 				</div>
 			</div>
+
+			<!-- Modal para Bloquear/Desbloquear Prompt -->
+			<div class="modal fade" id="acaoPromptModal{{ selected_lead.id }}" tabindex="-1" aria-labelledby="acaoPromptModalLabel{{ selected_lead.id }}" aria-hidden="true">
+				<div class="modal-dialog modal-dialog-centered">
+					<div class="modal-content">
+						<form action="/update-lead/{{ selected_lead.id }}" method="POST">
+							<div class="modal-header">
+								<h5 class="modal-title" id="acaoPromptModalLabel{{ selected_lead.id }}">Confirmar Ação?</h5>
+								<button type="button" class="close" data-dismiss="modal" aria-label="Fechar">
+									<span aria-hidden="true">&times;</span>
+								</button>
+							</div>
+							<div class="modal-body">
+								<p>Tem certeza que deseja <strong>{% if selected_lead.bloqueado %}Bloqueado{% else %}Desbloqueado{% endif %}</strong> este lead ?</p>
+							</div>
+							<div class="modal-footer">
+								<button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+								<button type="submit" class="btn btn-primary">Confirmar</button>
+							</div>
+						</form>
+					</div>
+				</div>
+			</div>
+
 			<!-- Modal para Deletar Prompt -->
 			<div class="modal fade" id="deletePromptModal{{ selected_lead.id }}" tabindex="-1" aria-labelledby="deletePromptModalLabel{{ selected_lead.id }}" aria-hidden="true">
 				<div class="modal-dialog modal-dialog-centered">

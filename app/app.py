@@ -1,6 +1,7 @@
 import requests
 import random
 
+import string
 
 from flask import Flask, render_template, request, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
@@ -55,6 +56,7 @@ class IA(db.Model):
     id = db.Column(db.Integer, primary_key=True, index=True)
     name = db.Column(db.String, nullable=False)
     phone_number = db.Column(db.String, nullable=False)
+    token_ia = db.Column(db.String, nullable=False)
     status = db.Column(db.Boolean, default=True, nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), server_default=db.func.now())
@@ -90,6 +92,9 @@ class IAConfig(db.Model):
     ai_api = db.Column(db.String, nullable=False)
     encrypted_credentials = db.Column(db.String, nullable=False)
 
+    probabilidade_audio =  db.Column( db.Integer)
+    audio_config =  db.Column(db.String, nullable=False)
+
     created_at = db.Column(db.DateTime(timezone=True), server_default=db.func.now())
     updated_at = db.Column(db.DateTime(timezone=True), server_default=db.func.now(), onupdate=db.func.now())
 
@@ -97,14 +102,33 @@ class IAConfig(db.Model):
 
     @property
     def credentials(self):
-        return decrypt_data(self.encrypted_credentials)
-    
+        """
+        Retorna as credenciais já descriptografadas.
+        """
+        if isinstance(self.encrypted_credentials, str):
+            return decrypt_data(self.encrypted_credentials)
+        else:
+
+            return self.encrypted_credentials
+
+    @property
+    def credentials_elevenlabs(self):
+        """
+        Retorna as credenciais já descriptografadas.
+        """
+        if isinstance(self.audio_config, str):
+            return decrypt_data(self.audio_config)
+        else:
+            return self.audio_config
+
 class Lead(db.Model):
     __tablename__ = 'leads'
     id = db.Column(db.Integer, primary_key=True, index=True)
     ia_id = db.Column(db.Integer, db.ForeignKey('ias.id'), nullable=False)
     name = db.Column(db.String, nullable=True)
     phone = db.Column(db.String, nullable=True, unique=True)
+    unique_token = db.Column(db.String, nullable=True, unique=True)
+    bloqueado = db.Column(db.Boolean, default=True)
     message = db.Column(db.JSON, nullable=False)
     resume = db.Column(db.String, nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), server_default=db.func.now())
@@ -126,8 +150,10 @@ def index():
                 "id": ia.ia_config.id,
                 "channel": ia.ia_config.channel,
                 "ai_api": ia.ia_config.ai_api,
-                "credentials": ia.ia_config.credentials
-            }]
+                "probabilidade_audio": ia.ia_config.probabilidade_audio,
+                "credentials": ia.ia_config.credentials,
+                "audio_config": ia.ia_config.credentials_elevenlabs
+                }]
             
         ia_info = {
             'id': ia.id,
@@ -152,9 +178,11 @@ def create_ia():
             ia_used = request.form.get('ia_used')
             apikey = request.form.get('apikey')
             model = request.form.get('model')
+            token_ia=generate_token()
             new_ia = IA(
                 name=name,
                 phone_number=phone_number,
+                token_ia=token_ia,
                 user_id = current_user.id,
                 status=True
             )
@@ -170,6 +198,7 @@ def create_ia():
                 ia_id=new_ia.id,
                 channel=channel,
                 ai_api= ia_used,
+                probabilidade_audio=0,
                 encrypted_credentials=encrypt_data(data)
             )
             
@@ -187,7 +216,7 @@ def create_ia():
                     "instanceName": f"{name}_{current_user.id}",
                     "integration": "WHATSAPP-BAILEYS",
                     "groupsIgnore": True,
-                    "readMessages": True,
+                    "readMessages": False,
                     "webhook": {
                             "url": url_webhook,
                             "byEvents": False,
@@ -223,14 +252,15 @@ def edit_ia(id_ia):
         if not ia:
             return redirect(url_for('index'))
         
-        name = request.form.get('name')
         phone_number = request.form.get('phone_number').strip().replace(' ', '').replace('-', '').replace('+', '')
         status = request.form.get('status')
-        channel = request.form.get('channel')
-        ia_used = request.form.get('ia_used')
+
         apikey = request.form.get('apikey')
         model = request.form.get('model')
-        ia.name = name
+        eleven_voice_id = request.form.get('eleven_voice_id')
+        eleven_api_key = request.form.get('eleven_api_key')
+        probabilidade_audio = request.form.get('probabilidade_audio')
+
         ia.phone_number = phone_number
         ia.status = True if status == 'True' else False 
 
@@ -238,22 +268,27 @@ def edit_ia(id_ia):
         if ia.ia_config is None:
             ia.ia_config = IAConfig(ia_id=ia.id)
 
-        ia.ia_config.channel = channel
-        ia.ia_config.ai_api = ia_used
-        
         if apikey:
             apikey = apikey.strip()
         if model:
             model = model.strip()
-
+        
         data = {
             "api_key": apikey,
             "api_secret": "openai",
             "ai_model":model
         }   
+
+        data_elevenlabs = {
+            "api_key_elevenlabs":eleven_api_key,
+            "audio_id":eleven_voice_id
+        }
         encrypted_data = encrypt_data(data)
+        encrypted_data_eleven = encrypt_data(data_elevenlabs)
         
+        ia.ia_config.probabilidade_audio = int(probabilidade_audio)
         ia.ia_config.encrypted_credentials = encrypted_data
+        ia.ia_config.audio_config = encrypted_data_eleven
         
         db.session.commit()
         
@@ -274,7 +309,7 @@ def delete_ia(id_ia):
             host = os.getenv("HOST_API")
             api_key = os.getenv("API_KEY")
 
-            url = f"{host}/instance/delete/{ia.name}_{current_user.id}"
+            url = f"{host}instance/delete/{ia.name}_{current_user.id}"
 
             headers = {"apikey": api_key}
 
@@ -320,8 +355,7 @@ def new_prompt(id_ia):
         new_prompt = Prompt(
             prompt_text=new_prompt_text,
             is_active=True if status == 'True' else False,
-            ia_id=id_ia,
-            user_id=current_user.id
+            ia_id=id_ia
         )
         
         db.session.add(new_prompt)
@@ -373,11 +407,31 @@ def delete_lead(id_lead):
         
     return redirect(url_for('get_leads_ia', ia_id = lead.ia_id))
 
+@app.route('/update-lead/<int:id_lead>', methods=['GET', 'POST'])
+@login_required
+def update_lead(id_lead):
+    if request.method == 'POST':
+        lead = Lead.query.filter_by(id=id_lead).first()
+        if not lead:
+            return redirect(url_for('get_leads_ia'))
+        
+        bloqueado = lead.bloqueado
+        if bloqueado == True:
+            lead.bloqueado = False
+        else:
+            lead.bloqueado = True
+
+        db.session.commit()
+        
+    return redirect(url_for('get_leads_ia', ia_id = lead.ia_id))
+
 
 @app.route('/get-leads-ia/<int:ia_id>', methods=['GET', 'POST'])
 @login_required
 def get_leads_ia(ia_id):
-    leads = Lead.query.filter_by(ia_id=ia_id).all()
+    page = request.args.get('page', 1, type=int)
+    per_page = 1000  # Number of items per page
+    leads = Lead.query.filter_by(ia_id=ia_id).order_by(Lead.updated_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
     leads_list = []
     lead_id = int(request.args.get("lead_id", 0))
     selected_lead = {}
@@ -385,6 +439,8 @@ def get_leads_ia(ia_id):
         lead_dict = {
             'id': lead.id,
             'ia_name': lead.ia.name,
+            'unique_token': lead.unique_token,
+            'bloqueado': lead.bloqueado,
             'ia_id': lead.ia.id,
             'name': lead.name,
             'phone': lead.phone,
@@ -470,7 +526,12 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
-
+def generate_token(length=6):
+    """
+    Generate a random token with specified length containing letters and numbers
+    """
+    characters = string.ascii_letters + string.digits
+    return ''.join(random.choice(characters) for _ in range(length))
 
 # Executar o aplicativo
 if __name__ == '__main__':

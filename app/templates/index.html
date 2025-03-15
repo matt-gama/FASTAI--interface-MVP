@@ -95,12 +95,13 @@
           {% endif %}
         </p>
         <div class="container">
-          <button class="btn btn-primary btn-block mb-2" data-toggle="modal" data-target="#promptModal{{ ia.id }}">
-            <i class="bi bi-chat-left-text"></i> Prompt
-          </button>
+          
           <a href="{{ url_for('get_leads_ia', ia_id=ia.id) }}" class="btn btn-primary btn-block">
             <i class="bi bi-people"></i> Leads
           </a>
+          <button class="btn btn-primary btn-block mb-2" data-toggle="modal" data-target="#promptModal{{ ia.id }}">
+            <i class="bi bi-chat-left-text"></i> Instruções
+          </button>
         </div>
       </div>
     </div>
@@ -121,40 +122,17 @@
             <!-- Nome -->
             <div class="form-group">
               <label for="editIaName{{ ia.id }}">Nome</label>
-              <input type="text" class="form-control" id="editIaName{{ ia.id }}" name="name" value="{{ ia.name }}" required>
+              <input type="text" class="form-control" id="editIaName{{ ia.id }}" name="name" value="{{ ia.name }}" disabled>
             </div>
             <!-- Telefone -->
             <div class="form-group">
               <label for="editIaPhone{{ ia.id }}">Telefone</label>
               <input type="text" class="form-control" id="editIaPhone{{ ia.id }}" name="phone_number" value="{{ ia.phone_number }}" required>
             </div>
-            <!-- Canal -->
-            <div class="form-group">
-              <label for="editIaChannel{{ ia.id }}">Canal</label>
-              <select class="form-control" id="editIaChannel{{ ia.id }}" name="channel" required>
-                <option value="Whatsapp" {% if ia.configs and ia.configs[0].channel == "Whatsapp" %}selected{% endif %}>Whatsapp</option>
-              </select>
-            </div>
-            <!-- IA Usada -->
-            <div class="form-group">
-              <label for="editIaUsed{{ ia.id }}">IA Usada</label>
-              <select class="form-control" id="editIaUsed{{ ia.id }}" name="ia_used" required>
-                <option value="Openai" {% if ia.configs and ia.configs[0].ai_api == "Openai" %}selected{% endif %}>Openai</option>
-              </select>
-            </div>
-            <!-- API Key -->
-            <div class="form-group">
-              <label for="editIaApikey{{ ia.id }}">API Key</label>
-              <input type="text" class="form-control" id="editIaApikey{{ ia.id }}" name="apikey" value="{% if ia.configs %}{{ia.configs[0].credentials.api_key}}{% endif %}" required>
-            </div>
-            <!-- Modelo a ser usado -->
-            <div class="form-group">
-              <label for="editIaModel{{ ia.id }}">Modelo a ser usado</label>
-              <input type="text" class="form-control" id="editIaModel{{ ia.id }}" name="model" value="{% if ia.configs %}{{ ia.configs[0].credentials.ai_model }}{% endif %}" required>
-            </div>
             <!-- Status com Radio Buttons -->
+            
             <div class="form-group">
-              <label>Status</label>
+              <label>Ativar/Inativar IA</label>
               <div class="form-check">
                 <input class="form-check-input" type="radio" name="status" id="statusTrue{{ ia.id }}" value="True" {% if ia.status %}checked{% endif %}>
                 <label class="form-check-label" for="statusTrue{{ ia.id }}">
@@ -168,6 +146,61 @@
                 </label>
               </div>
             </div>
+            <div class="card">
+              
+              <div class="card-body">
+              <h6><i class="bi bi-robot"></i> Configurações da IA</h6>
+                <!-- Modelo a ser usado -->
+                <div class="form-group">
+                  <label for="editIaModel{{ ia.id }}">Modelo a ser usado</label>
+                  <select class="form-control" id="editIaModel{{ ia.id }}" name="model" required>
+                    <option value="gpt-4o" {% if ia.configs and ia.configs[0].credentials.ai_model == "gpt-4o" %}selected{% endif %}>GPT-4o</option>
+                    <option value="gpt-4o-mini" {% if ia.configs and ia.configs[0].credentials.ai_model == "gpt-4o-mini" %}selected{% endif %}>GPT-4o Mini</option>
+                  </select>
+                </div>
+                <!-- API Key -->
+                <div class="form-group">
+                  <label for="editIaApikey{{ ia.id }}">API Key</label>
+                  <input type="text" class="form-control" id="editIaApikey{{ ia.id }}" name="apikey" value="{% if ia.configs %}{{ia.configs[0].credentials.api_key}}{% endif %}" required>
+                </div>
+                
+              </div>
+            </div>
+            </br>
+            <div class="card">
+              <div class="card-body">
+              <h6><i class="bi bi-soundwave"></i> Configurações de envio de Áudio</h6>
+                <!-- Probabilidade de Áudio -->
+                <div class="form-group">
+                  <label for="editIaAudioProb{{ ia.id }}">Probabilidade de Áudio</label>
+                  <input type="range" class="form-control-range" id="editIaAudioProb{{ ia.id }}" name="probabilidade_audio" min="0" max="100" value="{% if ia.configs %}{{ ia.configs[0].probabilidade_audio|default(0) }}{% else %}0{% endif %}" oninput="updateAudioProbValue{{ ia.id }}(this.value)">
+                  <small class="form-text text-muted">Valor: <span id="audioProbValue{{ ia.id }}">{% if ia.configs %}{{ ia.configs[0].probabilidade_audio|default(0)|int }}{% else %}0{% endif %}</span>%</small>
+                </div>
+                <!-- Campos ElevenLabs -->
+                <div id="elevenLabsFields{{ ia.id }}">
+                  <div class="row">
+                    <div class="col-md-6">
+                      <div class="form-group">
+                        <label for="editIaElevenApiKey{{ ia.id }}">ElevenLabs API Key</label>
+                        <input type="text" class="form-control" id="editIaElevenApiKey{{ ia.id }}" name="eleven_api_key" value="{% if ia.configs %}{{ ia.configs[0].audio_config.api_key_elevenlabs|default('') }}{% endif %}">
+                      </div>
+                    </div>
+                    <div class="col-md-6">
+                      <div class="form-group">
+                        <label for="editIaElevenVoiceId{{ ia.id }}">ElevenLabs Voice ID</label>
+                        <input type="text" class="form-control" id="editIaElevenVoiceId{{ ia.id }}" name="eleven_voice_id" value="{% if ia.configs %}{{ ia.configs[0].audio_config.audio_id|default('') }}{% endif %}">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <script>
+            function updateAudioProbValue{{ ia.id }}(value) {
+                document.getElementById('audioProbValue{{ ia.id }}').textContent = Math.round(value);
+            }
+            </script>
+
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
